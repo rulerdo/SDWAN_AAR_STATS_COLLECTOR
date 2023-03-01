@@ -89,10 +89,10 @@ class vManage():
         devices = []
 
         for device in response.json()["data"]:
-            if 'vedge' in device["device-type"]:
+            if 'vedge' in device["device-type"] and device.get("site-id"):
                 new_row = []
                 for header in headers:
-                    new_row.append(device[header])
+                    new_row.append(device.get(header))
                 devices.append(new_row)
 
         return devices
