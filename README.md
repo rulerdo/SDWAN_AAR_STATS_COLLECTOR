@@ -30,7 +30,7 @@ Once script runs successfully the AAR BFD stats will be saved on a CSV file save
 
 ## Contact
 
-Please use issues section on vmanage to request new funtionality or report bugs
+Please use issues section on github to request new funtionality or report bugs
 
 For any comment email the authors
 
