@@ -28,6 +28,10 @@ Once script runs successfully the AAR BFD stats will be saved on a CSV file save
 
     AAR-STATS-[TIMESTAMP].csv
 
+Script supports debug mode add the --debug keyboard and an extended output will be created with detailed messages from execution
+
+    python aar_stats_collector.py --range 100-200 --debug
+
 ## Contact
 
 Please use issues section on github to request new funtionality or report bugs

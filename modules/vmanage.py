@@ -1,14 +1,16 @@
 import requests
 from urllib3.exceptions import InsecureRequestWarning
+from requests.exceptions import ConnectionError
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 from time import time
-
+import sys
+import logging
 
 class vManage():
 
-
     def __init__(self,server,port,username,password):
 
+        self.logger = logging.getLogger('VMANAGE')
         self.username = username
         self.password = password
         self.server = server
@@ -23,20 +25,33 @@ class vManage():
 
     def get_auth_cookie(self):
 
-        url = f"https://{self.host}/j_security_check"
+        self.logger.debug('Obtaining auth cookie')
 
-        payload = f'j_username={self.username}&j_password={self.password}'
-        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        try:
 
-        response = requests.request("POST", url, headers=headers, data=payload, verify=False)
+            url = f"https://{self.host}/j_security_check"
 
-        cookie = response.cookies.get_dict()['JSESSIONID']
+            payload = f'j_username={self.username}&j_password={self.password}'
+            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
-        return cookie
+            response = requests.request("POST", url, headers=headers, data=payload, verify=False, timeout=10)
 
+            if b'<html>' in response.content:
+                self.logger.error('Invalid credentials!')
+                sys.exit(1)
+
+            cookie = response.cookies.get_dict()['JSESSIONID']
+            self.logger.debug(f'Cookie found: {cookie}')
+
+            return cookie
+        
+        except ConnectionError:
+            self.logger.error('Connection unreachable!')
+            sys.exit(1)
 
     def get_auth_token(self):
 
+        self.logger.debug('Obtaining auth token')
         url = f"https://{self.server}/dataservice/client/token"
 
         payload={}
@@ -47,6 +62,7 @@ class vManage():
         response = requests.request("GET", url, headers=headers, data=payload, verify=False)
 
         token = response.text
+        self.logger.debug(f'Token found: {token}')
 
         return token
 
@@ -62,6 +78,7 @@ class vManage():
         }
 
         response = requests.request(action, url, headers=headers, data=body, verify=False)
+        self.logger.debug(f'Request sent {response.request}')
 
         return response
                 
@@ -79,10 +96,12 @@ class vManage():
         response = requests.request("GET", url, headers=headers, data=payload, verify=False)
 
         message = 'vManage session closed!' if response.status_code == 200 else 'Problems closing session'
-        print(message)
+        self.logger.debug(message)
 
     
     def get_devices(self):
+
+        self.logger.debug('Collecting devices')
 
         response = self.send_request('GET','/device',body={})
         headers = ['host-name', 'system-ip', 'site-id', 'reachability', 'device-type', 'device-model']
@@ -95,11 +114,14 @@ class vManage():
                     new_row.append(device.get(header))
                 devices.append(new_row)
 
+        self.logger.debug(f'Devices: {devices}')
+
         return devices
     
 
     def get_active_policyID(self):
-    
+        
+        self.logger.debug('Getting active policy ID')
         response = self.send_request('GET','/template/policy/vsmart',body={})
 
         for policy in response.json()["data"]:
@@ -108,11 +130,14 @@ class vManage():
                 break
 
         policyID = active_policy["policyId"]
+        self.logger.debug(f'Policy ID: {policyID}')
 
         return policyID
     
     
     def get_active_policy(self):
+
+        self.logger.debug('Collecting active Centralized Policy')
 
         response = self.send_request('GET',f'/template/policy/vsmart/definition/{self.policyID}',body={})
 
@@ -122,11 +147,14 @@ class vManage():
         else:
             policy = response.json()["policyDefinition"].splitlines()
 
+        self.logger.debug(f'Active Centralized Policy: {policy}')
+
         return policy
+
 
     def collect_aar_stats(self,system_ips):
 
-        
+        self.logger.debug('Collecting AAR stats')
         headers = ["vdevice-host-name","local-color","remote-system-ip","remote-color","mean-loss","average-latency","mean-jitter"]
         data = [headers]
         
@@ -144,5 +172,7 @@ class vManage():
                     new_row.append(line[item])
 
                 data.append(new_row)
+        
+        self.logger.debug(f'AAR Stats: {data}')
 
         return data

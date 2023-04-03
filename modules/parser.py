@@ -3,21 +3,30 @@ import csv
 from datetime import datetime
 import yaml
 from argparse import ArgumentParser
+import sys
+import logging
+logger = logging.getLogger('PARSER')
 
 
-def get_range_args():
+def get_args():
 
+    logger.debug('Getting arguments from terminal')
     parser = ArgumentParser(description='Arguments for AAR Stats Collector')
     parser.add_argument('--range', '-r', required=True, type=str, help='Site ID range to catch devices for SDWAN overlay')
+    parser.add_argument('--debug', '-d', action='store_true', help='Use this flag to enable debug mode')
     arguments = parser.parse_args()
-
+    
     ranges = [arguments.range]
+    debug = arguments.debug
+    logger.debug(f'Range: {ranges}')
+    logger.debug(f'Debug: {debug}')
 
-    return ranges
+    return ranges,debug
 
 
 def load_yaml_config(config_file):
 
+    logger.debug('Getting variables from YAML file')
     with open(config_file, 'r') as f:
         variables = yaml.safe_load(f)
 
@@ -29,12 +38,14 @@ def load_yaml_config(config_file):
     port = variables['PORT']
     username = variables['USERNAME']
     password = variables['PASSWORD']
+    logger.debug(f'Variables: {variables}')
 
     return server,port,username,password
         
 
 def find_apply_policy(lines):
 
+    logger.debug('obtaining apply policy section')
     parent_pattern = 'apply-policy'
 
     for i,line in enumerate(lines):
@@ -42,7 +53,8 @@ def find_apply_policy(lines):
             start_index = i
 
     apply_policy = lines[start_index:]
-    
+    logger.debug(f'apply policy: {apply_policy}')
+
     return apply_policy
 
 
@@ -74,6 +86,8 @@ def find_site_lists_section(lines):
             if write_flag:
                 site_list_section.append(line)
             pass
+    
+    logger.debug(f'site-list policy: {site_list_section}')
 
     return site_list_section
 
@@ -98,6 +112,12 @@ def find_devices_range(devices,ranges_list):
             for device in devices:
                 if int(device[2]) in range(start,end):
                     devices_in_range.append(device[1])
+
+        if not devices_in_range:
+            logger.warning(f'No devices found for range: {ranges_list}')
+            sys.exit(1)
+    
+    logger.debug(f'Devices in range {devices_in_range}')
                     
     return devices_in_range
 
@@ -110,14 +130,16 @@ def save_to_csv(data,filename):
         for line in data:
             writer_csv.writerow(line)
 
-    print(f'File saved as: {filename}')
+    logger.info(f'File saved as: {filename}')
 
 
 def create_filename():
 
+    logger.debug('Creating CSV filename')
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     modules = os.path.dirname(__file__)
     outputs = os.path.join(os.path.dirname(modules), "outputs")
     filename = os.path.join(outputs, f'AAR-STATS-{timestamp}.csv')
-    
+    logger.debug(f'Filename: {filename}')
+
     return filename
